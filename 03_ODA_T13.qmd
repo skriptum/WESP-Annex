@@ -211,21 +211,28 @@ df_table <- df_growth  %>%
   filter(
     DONOR %in% c(
       "DAC", "DACEU", # aggregates
-      "FRA", "DEU", "ITA", "ESP", # selected EU countries
-      # all other EU countries COMMENT IN IF NEEDED
-      # "AUT","BEL", "CZE","DNK","EST","FIN","GRC","HUN","IRL","ISL","LTU","LUX","LVA","NLD","POL","PRT","SVK","SVN","SWE",
+      
+      # western EU Countries (from original table)
+      "AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE",
+      
+      # FORGOTTEN EU Countries (Comment in if wanted)
+      #"CZE", "EST", "HUN", "ISL", "LTU", "LVA", "POL", "PRT", "SVK", "SVN",
       # other DAC countries
       "AUS", "CAN", "JPN", "KOR", "NZL", "NOR", "CHE", "GBR", "USA"
       )
   ) %>%
   arrange(factor(DONOR, levels = c(
-    "DAC", "DACEU", 
-    "FRA", "DEU", "ITA", "ESP", # selected EU countries
-    # all other EU countries COMMENT IN IF NEEDED
-    # "AUT","BEL", "CZE","DNK","EST","FIN","GRC","HUN","IRL","ISL","LTU","LUX","LVA","NLD","POL","PRT","SVK","SVN","SWE",
+    "DAC", "DACEU", # aggregates
+    
+    # western EU Countries (from original table)
+    "AUT", "BEL", "DNK", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LUX", "NLD", "PRT", "ESP", "SWE",
+    
+    # FORGOTTEN EU Countries (Comment in if wanted)
+    #"CZE", "EST", "HUN", "ISL", "LTU", "LVA", "POL", "PRT", "SVK", "SVN",
+    
     # other DAC countries
     "AUS", "CAN", "JPN", "KOR", "NZL", "NOR", "CHE", "GBR", "USA" 
-    )))
+  )))
 
 df_table
 ```

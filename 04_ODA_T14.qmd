@@ -7,13 +7,9 @@ NOTE:
   - comment it out in last code block to remove it from the table
   
 CHECK with 2025 WESP:
-- Debt relief: slight deviation due to using the Bilateral Data and not the Total ODA data
-- Other Multilaterals: calculated as differential, therefore new numbers
-- Loans: used the Loans Data available in Table 2a, I was not able to reproduce the ones in the WESP table
-
-Also: 
-- Humanitarian Aid + Loans are NOT exclusively Bilateral! 
-- Table2a from OECD combines disbursements from countries as well as Multilat. Org. 
+- slight rounding differences
+- Debt relief: slight deviation due to new numbers
+- Loans: corrected the Loans data (prev one included only to Dev. C. )
 
 **UPDATE HERE:** BASE YEAR = current year - 1 (most of the time, depends on data availability)
 
@@ -58,7 +54,7 @@ Selection:
 
 API access via SDMX
 ```{r}
-url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/DAC._Z.1902+1800+1010+1600+2102+2103+2104+2105+1015+2000+2101..1140.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/DAC._Z.1902+1800+1010+1600+2102+2103+2104+2105+1015+2000+2101+2108..1140.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
 ```
 
 ```{r}
@@ -87,7 +83,8 @@ table_final <- df_4 %>%
       MEASURE == "2102" ~ "EU Institutions",
       MEASURE == "2103" ~ "World Bank", # IDA
       MEASURE == "2104" ~ "World Bank", # IBRD, IFC
-      MEASURE == "2105" ~ "Regional Development Banks"
+      MEASURE == "2105" ~ "Regional Development Banks",
+      MEASURE == "2108" ~ "Others"
     )
   ) %>%
   # combine WB rows
@@ -101,6 +98,8 @@ table_final
 ```
 
 ### Other Mulitlaterals
+
+if needed, calculate "Other Multilaterals" as the difference between *Multilateral* and the sum of the specified multilaterals
 
 ```{r}
 row_other_mult <- table_final %>%
@@ -200,7 +199,7 @@ Assembling all parts of the final table, and sort according to the original orde
 table_comb <- table_final %>%
   bind_rows(rows_ha) %>%
   bind_rows(row_ldc) %>%
-  bind_rows(row_other_mult) %>%
+  # bind_rows(row_other_mult) %>%  # if needed
   arrange(factor(target, levels = c(
     "**Total ODA**",
     "*Bilateral*",
@@ -214,7 +213,8 @@ table_comb <- table_final %>%
     "EU Institutions",
     "World Bank",
     "Regional Development Banks",
-    "Other Multilaterals",
+    # "Other Multilaterals",
+    "Others",
     "*Memo Item*: ODA to LDC"
   ))) %>%
   mutate(across(-target, ~ round(.x, 1))) #%>%
