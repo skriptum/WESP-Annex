@@ -1,0 +1,65 @@
+# WESP Codes 
+
+Use this file to create a dataset with WESP classification codes for countries (e.g Fuel importer / exporter etc)
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(haven)
+```
+
+```{r}
+df_regions <- read_excel("./data/Regions.xlsx")
+```
+
+```{r}
+df_regions <- df_regions %>%
+  filter(
+    Group == "0"
+  ) %>%
+  reframe(
+    ISO3 = ISO,
+    country = `Full country name`,
+    short_country = `Short country name`,
+    status = Development_status,
+    wesp_region = `Region (WESP Annex)`,
+    wesp_subregion = `Subregion (WESP Annex)`,
+    dummy_EUR = EUR,
+    dummy_EU28 = E28,
+    dummy_EU27 = E27,
+    dummy_otherEUR = OEU,
+    dummy_exporter = FEX,
+    dummy_CIS = CIS,
+    dummy_SEE = SEE,
+
+  ) 
+```
+
+
+Add descriptions to column names
+
+```{r}
+desc <- c(
+  ISO3 = "ISO 3166-1 alpha-3 country code",
+  country = "Full country name",
+  short_country = "Short country name",
+  status = "Development status as per WESP Annex",
+  wesp_region = "Region as per WESP Annex",
+  wesp_subregion = "Subregion as per WESP Annex",
+  country_code = "UN M49 country code",
+  dummy_EUR = "European countries",
+  dummy_EU27 = "EU27 countries",
+  dummy_EU28 = "EU28 countries",
+  dummy_otherEUR = "Other European countries",
+  dummy_exporter = "Fuel Exporter countries",
+  dummy_CIS = "Commonwealth of Independent States",
+  dummy_SEE = "South Eastern Europe dummy"
+)
+
+common::labels(df_regions) <- desc
+```
+
+```{r}
+haven::write_dta(df_regions, "./data/WESP_classification.dta")
+```
+

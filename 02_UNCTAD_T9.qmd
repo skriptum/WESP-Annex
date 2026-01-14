@@ -1,0 +1,138 @@
+# Table 9
+
+Table 9 releis on UNCTAD data for:
+- commodity prices for selected commodities
+- from https://unctadstat.unctad.org/datacentre/dataviewer/US.UCPI_A
+
+Check with print version WESP 2025: exactly the same
+
+
+**UPDATE HERE**: BASE YEAR = CURRENT YEAR
+```{r}
+base_year <- 2025
+```
+
+
+## Getting the data
+
+Method
+- uses the bulk download permalink to get all years of data
+- extracts the donwload into a temporary directory and unzips
+- then uses the CSV
+
+Reason: API needs key, which is more difficult than just this
+
+```{r}
+library(tidyverse)
+```
+
+Annual Data
+```{r}
+url_A <- "https://unctadstat-api.unctad.org/bulkdownload/US.UCPI_A/US_UCPI_A"
+
+file_7z_A <- tempfile(fileext = ".7z")
+dir_A     <- tempfile("unctad_annual_")
+
+dir.create(dir_A)
+
+download.file(url_A, file_7z_A, mode = "wb")
+archive::archive_extract(file_7z_A, dir = dir_A)
+
+csv_A <- list.files(dir_A, pattern = "\\.csv$", full.names = TRUE)
+df_A  <- read_csv(csv_A)
+
+on.exit(unlink(dir_A, recursive = TRUE), add = TRUE)
+```
+
+Monthly Data (for most recent year calcs)
+```{r}
+url_M <- "https://unctadstat-api.unctad.org/bulkdownload/US.UCPI_M/US_UCPI_M"
+
+file_7z_M <- tempfile(fileext = ".7z")
+dir_M     <- tempfile("unctad_monthly_")
+
+dir.create(dir_M)
+
+download.file(url_M, file_7z_M, mode = "wb")
+archive::archive_extract(file_7z_M, dir = dir_M)
+
+csv_M <- list.files(dir_M, pattern = "\\.csv$", full.names = TRUE)
+df_M  <- read_csv(csv_M)
+
+on.exit(unlink(dir_M, recursive = TRUE), add = TRUE)
+```
+
+## Processing
+
+```{r}
+df_A_clean <- df_A %>%
+  reframe(
+    Year        = as.integer(Year),
+    Commodity   = `Commodity Label`,
+    Price_Index = as.double(`Index Base 2015`),
+  ) %>%
+  pivot_wider(
+    names_from  = Commodity,
+    values_from = Price_Index
+  ) %>%
+  select(
+    Year, Food, `Tropical beverages`, `Vegetable oilseeds and oils`, `Agricultural raw materials`,
+    `Minerals, ores and metals`, `All groups`, `All groups excl. fuels`, `Fuels`
+  ) %>%
+  filter(Year >= base_year-9) # last 10 years
+  # filter(Year >= 2015) # from 2015 onwards
+
+df_A_clean
+```
+
+now the monthly calculations for the most recent year, sorted into Quarters
+
+```{r}
+df_M_clean <- df_M %>%
+  reframe(
+    Year  = as.integer(substr(Period, 1, 4)),
+    month = as.integer(substr(Period, 6, 7)),
+    Commodity   = `Commodity Label`,
+    Price_Index = as.double(`Index Base 2015`),
+  ) %>%
+  pivot_wider(
+    names_from  = Commodity,
+    values_from = Price_Index
+  ) %>%
+  filter(Year >= base_year-2) %>% # last 3 years should have quarter-wise analysis
+  group_by(Year) %>%
+  mutate(quarter = case_when(
+    month %in% 1:3   ~ 1,
+    month %in% 4:6   ~ 2,
+    month %in% 7:9   ~ 3,
+    month %in% 10:12 ~ 4,
+    TRUE             ~ NA_real_
+  )) %>%
+  group_by(Year, quarter) %>%
+  filter(n() == 3) %>% # filter out if quarter has less than 3 months of data
+  summarise_all(mean) %>%
+  reframe(
+    Year = paste0(Year, " Q", quarter),
+    Food, `Tropical beverages`, `Vegetable oilseeds and oils`, `Agricultural raw materials`,
+    `Minerals, ores and metals`, `All groups`, `All groups excl. fuels`, `Fuels`
+  ) 
+
+df_M_clean
+```
+
+## Combining
+
+```{r}
+df_combined <- df_A_clean %>%
+  mutate(Year = as.character(Year)) %>%
+  bind_rows(df_M_clean) %>%
+  mutate(across(-Year, ~ round(.x, 0))) 
+
+df_combined
+```
+
+Saving
+```{r}
+writexl::write_xlsx(df_combined, "output/table_9_commodity_price_indices.xlsx")
+```
+

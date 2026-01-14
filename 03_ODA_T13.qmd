@@ -1,0 +1,239 @@
+# Table 13
+
+NOTE:
+- updated groupings for the first 2 columns to reflect 10 year intervals
+- selection of EU countries adjustable in last code block (my selection = 4 largest)
+- most recent year may differ each time you compile, because of data updates
+
+CHECK with print version
+- 2024 data not comparable bcause of data updates (but very close)
+- growth data for 2022, 2023 = exactly the same (aka the calcualtion should be correct)
+- because of time frame updates: 10 year windwows not comparable
+
+**UPDATE HERE**: BASE YEAR = CURRENT YEAR - 1 (most of the time, depends on data availability)
+```{r}
+base_year <- 2024
+```
+
+How it works (broadly):
+- go to the online Table viewer at OECD stats site (http://stats.oecd.org/index.aspx?datasetcode=table1)
+- Select some groupings / measurements on the left side (described at respective parts of the code)
+- go to "Developer API" tab and copy the Data Query for SDMX
+=> these are the urls in the code below
+
+--- 
+
+```{r}
+library(tidyverse)
+library(rsdmx)
+```
+
+## Columns: growth rates
+
+Online Table viewer: http://stats.oecd.org/index.aspx?datasetcode=table1
+
+Selection:
+- Donor: DAC countries (dont forget the DAC EU countries box at the bottom)
+- Measure: Official Development Assistance (ODA), Disbursements net
+- Flow type: Disbursements, net
+- Price base: Constant
+- Combined unit of measure: US dollar, Millions, 2023
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1010..1140.USD.Q?startPeriod=2000&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_1 <- readSDMX(url)
+df_1 <- as.data.frame(dataset_1)
+```
+
+Method: calculate year-on-year growth rates, then average them over the respective periods
+Note: if you want to adjust the periods, do it in the `case_when` part below
+
+```{r}
+df_growth <- df_1 %>%
+  select(DONOR, TIME_PERIOD, obsValue) %>%
+  # calc growth rate
+  arrange(TIME_PERIOD) %>%
+  group_by(DONOR) %>%
+  mutate(growth_rate = (obsValue / lag(obsValue) - 1) * 100) %>%
+  # create groups for summing up
+  mutate(group = case_when(
+    TIME_PERIOD == base_year ~ as.character(base_year),
+    TIME_PERIOD == (base_year - 1) ~ as.character(base_year - 1),
+    TIME_PERIOD == (base_year - 2) ~ as.character(base_year - 2),
+    TIME_PERIOD <= (base_year - 3) & TIME_PERIOD >= (base_year - 12) ~ paste0(base_year - 12,"-", base_year - 3),
+    TIME_PERIOD <= (base_year - 13) & TIME_PERIOD >= (base_year - 22) ~ paste0(base_year - 22,"-", base_year - 13)
+    )
+  ) %>%
+  filter(!is.na(group)) %>%
+  group_by(DONOR, group) %>%
+  reframe(
+    growth_rate_avg = mean(growth_rate, na.rm = T),
+    growth_rate_avg = round(growth_rate_avg, 1)
+    ) %>%
+  # pivot to make original table
+  pivot_wider(names_from = group, values_from = growth_rate_avg) 
+
+#df_growth
+```
+
+
+## Column: total ODA
+
+same Table: http://stats.oecd.org/index.aspx?datasetcode=table1
+
+Selection:
+- Donor: DAC countries (dont forget the DAC EU countries box at the bottom)
+- Measure: Official Development Assistance (ODA), Disbursements net
+- Flow type: Disbursements, net
+- Price base: Current
+- Combined unit of measure: US dollar, Millions
+
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1010..1140.USD.V?startPeriod=2020&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_current <- readSDMX(url)
+df_current <- as.data.frame(dataset_current)
+```
+
+
+```{r}
+df_total <- df_current %>%
+  select(DONOR, TIME_PERIOD, obsValue) %>%
+  filter(TIME_PERIOD == base_year) %>%
+  reframe(
+    DONOR,
+    TOTAL_ODA = round(obsValue / 1e3, 3)
+  ) 
+
+#df_total
+```
+
+## Column: Percentage of GNI
+
+same table: http://stats.oecd.org/index.aspx?datasetcode=table1
+
+Selection: 
+- Donor: DAC countries (dont forget the DAC EU countries box at the bottom)
+- Measure: GNI at current prices
+- Flow type: Disbursements, net
+- Price base: Current
+- Combined unit of measure: US dollar, Millions
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1..1140.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_2 <- readSDMX(url)
+df_2 <- as.data.frame(dataset_2)
+```
+
+```{r}
+df_gni <- df_2 %>%
+  select(DONOR, TIME_PERIOD, obsValue) %>%
+  filter(TIME_PERIOD == base_year) %>%
+  reframe(DONOR, GNI = obsValue) %>%
+  left_join(df_total, by = "DONOR") %>%
+  mutate(
+    GNI = GNI/1e3,
+    PCT_GNI = round( (TOTAL_ODA / GNI) * 100 , 2)
+  ) %>%
+  select(DONOR, PCT_GNI)
+
+#df_gni
+```
+
+## Columns: distribution
+
+
+
+same table, different Selection: 
+- Donor: DAC countries (dont forget the DAC EU countries box at the bottom)
+- Measure: 
+  - Bilateral ODA
+  - Multilateral ODA
+    - UN Agencies
+- Flow type: Disbursements, net
+- Price base: Current
+- Combined unit of measure: US dollar, Millions
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1015+2000+2101..1140.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_3 <- readSDMX(url)
+df_3 <- as.data.frame(dataset_3)
+```
+
+```{r}
+df_distribution <- df_3 %>%
+  filter(TIME_PERIOD == base_year) %>%
+  mutate(
+    target = case_when(
+      MEASURE == "2101" ~ "UN",
+      MEASURE == "2000" ~ "Multilateral",
+      MEASURE == "1015" ~ "Bilateral"
+    )
+  ) %>%
+  select(DONOR, target, obsValue) %>%
+  pivot_wider(names_from = target, values_from = obsValue) %>%
+  # distributions
+  mutate(
+    total = Bilateral + Multilateral,
+    multi_other = Multilateral - UN,
+    pct_bilateral = round((Bilateral / total) * 100, 1),
+    pct_multilateral = round((Multilateral / total) * 100, 1),
+    pct_un = round((UN / total) * 100, 1),
+    pct_multi_other = round((multi_other / total) * 100, 1)
+  ) %>%
+  select(DONOR, pct_bilateral, pct_multilateral, pct_un, pct_multi_other)
+
+#df_distribution
+```
+
+
+## Final Table
+
+Assemble all together, adjust the filter to only have certain countries in the final table
+
+```{r}
+df_table <- df_growth  %>%
+  left_join(df_gni, by = "DONOR") %>% # combine with pct of GNI
+  left_join(df_total, by = "DONOR") %>% # combine with total ODA for base year
+  left_join(df_distribution, by = "DONOR") %>% # combine with distribution
+  filter(
+    DONOR %in% c(
+      "DAC", "DACEU", # aggregates
+      "FRA", "DEU", "ITA", "ESP", # selected EU countries
+      # all other EU countries COMMENT IN IF NEEDED
+      # "AUT","BEL", "CZE","DNK","EST","FIN","GRC","HUN","IRL","ISL","LTU","LUX","LVA","NLD","POL","PRT","SVK","SVN","SWE",
+      # other DAC countries
+      "AUS", "CAN", "JPN", "KOR", "NZL", "NOR", "CHE", "GBR", "USA"
+      )
+  ) %>%
+  arrange(factor(DONOR, levels = c(
+    "DAC", "DACEU", 
+    "FRA", "DEU", "ITA", "ESP", # selected EU countries
+    # all other EU countries COMMENT IN IF NEEDED
+    # "AUT","BEL", "CZE","DNK","EST","FIN","GRC","HUN","IRL","ISL","LTU","LUX","LVA","NLD","POL","PRT","SVK","SVN","SWE",
+    # other DAC countries
+    "AUS", "CAN", "JPN", "KOR", "NZL", "NOR", "CHE", "GBR", "USA" 
+    )))
+
+df_table
+```
+
+Save it to an excel file
+
+```{r}
+writexl::write_xlsx(df_table, "output/table_13_oecd_oda.xlsx")
+```
+
+

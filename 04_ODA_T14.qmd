@@ -1,0 +1,232 @@
+# Table 14
+
+
+NOTE: 
+- most recent year may differ each time you compile, because of data updates
+- added the option of In-Donor Costs (potentially relevant because of Refugees)
+  - comment it out in last code block to remove it from the table
+  
+CHECK with 2025 WESP:
+- Debt relief: slight deviation due to using the Bilateral Data and not the Total ODA data
+- Other Multilaterals: calculated as differential, therefore new numbers
+- Loans: used the Loans Data available in Table 2a, I was not able to reproduce the ones in the WESP table
+
+Also: 
+- Humanitarian Aid + Loans are NOT exclusively Bilateral! 
+- Table2a from OECD combines disbursements from countries as well as Multilat. Org. 
+
+**UPDATE HERE:** BASE YEAR = current year - 1 (most of the time, depends on data availability)
+
+```{r}
+base_year <- 2024
+```
+
+How it works (broadly):
+- go to the online Table viewer at OECD stats site (e.g http://stats.oecd.org/index.aspx?datasetcode=table1)
+- Select some groupings / measurements on the left side (described at respective parts of the code)
+- go to "Developer API" tab and copy the Data Query for SDMX
+=> these are the urls in the code below
+
+
+---
+
+```{r}
+library(tidyverse)
+library(rsdmx)
+```
+
+## Load the Data
+
+Online table viewer: http://stats.oecd.org/index.aspx?datasetcode=table1
+
+Selection:
+- Donor: DAC countries 
+- Measure: Official Development Assistance (ODA), and subcategories
+ - Bilateral ODA
+   - Debt relief
+   - Other In-donor expenditures
+   - Memo: Free Standing Technical Cooperation
+  - Multilateral ODA
+    - UN Agencies
+    - EU Institutions
+    - IDA
+    - Other World Bank
+    - Regional Development Banks
+- Flow type: Disbursements, net
+- Price base: Current prices
+- Combined unit of measure: US dollar, Millions
+
+API access via SDMX
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/DAC._Z.1902+1800+1010+1600+2102+2103+2104+2105+1015+2000+2101..1140.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_4 <- readSDMX(url)
+df_4 <- as.data.frame(dataset_4)
+```
+
+## Cleaning 
+
+```{r}
+table_final <- df_4 %>%
+  filter(TIME_PERIOD > base_year-10) %>%
+  mutate(
+    target = case_when(
+      MEASURE == "1010" ~ "**Total ODA**",
+      # Bilat
+      MEASURE == "1015" ~ "*Bilateral*",
+      MEASURE == "1902" ~ "Technical Cooperation",
+      # MEASURE == "1310" ~ "Investment Projects",
+      MEASURE == "1600" ~ "Debt relief",
+      MEASURE == "1800" ~ "In Donor Costs",
+      
+      # multilateral
+      MEASURE == "2000" ~ "*Multilateral*",
+      MEASURE == "2101" ~ "UN agencies",
+      MEASURE == "2102" ~ "EU Institutions",
+      MEASURE == "2103" ~ "World Bank", # IDA
+      MEASURE == "2104" ~ "World Bank", # IBRD, IFC
+      MEASURE == "2105" ~ "Regional Development Banks"
+    )
+  ) %>%
+  # combine WB rows
+  group_by(TIME_PERIOD, target) %>%
+  reframe(obsValue = sum(obsValue) / 1e3) %>%
+  # pivot
+  select(target, TIME_PERIOD, obsValue) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = obsValue) 
+
+table_final 
+```
+
+### Other Mulitlaterals
+
+```{r}
+row_other_mult <- table_final %>%
+  pivot_longer(-target, names_to = "TIME_PERIOD", values_to = "obsValue") %>%
+  filter(target %in% c("*Multilateral*", "UN agencies", "EU Institutions", "World Bank", "Regional Development Banks")) %>%
+  group_by(TIME_PERIOD) %>%
+  # row wise: *Multilateral* - the rest
+  reframe(obsValue = obsValue[target == "*Multilateral*"] - sum(obsValue[target != "*Multilateral*"])) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = obsValue) %>%
+  mutate(target = "Other Multilaterals")
+  
+row_other_mult
+```
+
+
+### Humanitarian Aid data
+
+NOTE: Drawn from a different Table!
+
+Online table viewer: http://stats.oecd.org/index.aspx?datasetcode=table2a
+
+Selection
+- Donor:  DAC countries
+- Recipient: All recipients
+- Measure: 
+  - Humanitarian aid
+  - ODA Loans, net disbursements
+  - Debt forgiveness
+- Price base: Constant prices
+- Combined unit of measure: US dollar, Millions, 2023
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC2@DF_DAC2A,/DAC.ALLR.216+218.USD.V?startPeriod=2015&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_ha <- readSDMX(url)
+df_ha <- as.data.frame(dataset_ha)
+```
+
+```{r}
+rows_ha <- df_ha %>%
+  mutate(target = case_when(
+    # MEASURE == 212 ~ "Debt forgiveness",
+    MEASURE == 216 ~ "Humanitarian Aid",
+    MEASURE == 218 ~ "Loans"
+  )) %>%
+  group_by(TIME_PERIOD, target) %>%
+  reframe(obsValue = sum(obsValue) / 1e3) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = obsValue)
+
+rows_ha
+```
+
+
+
+
+
+### LDC data 
+
+Online table viewer (same as for Humanitarian Aid): http://stats.oecd.org/index.aspx?datasetcode=table2a
+
+Selection
+- Donor: DAC countries
+- Recipient: Least developed countries
+- Measure: Official development assistance (ODA), disbursements
+- Price base: Constant prices
+- Combined unit of measure: US dollar, Millions, 2023
+
+```{r}
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC2@DF_DAC2A,/DAC.LDC.206.USD.V?startPeriod=2010&dimensionAtObservation=AllDimensions"
+```
+
+```{r}
+dataset_ldc <- readSDMX(url)
+df_ldc <- as.data.frame(dataset_ldc)
+```
+
+```{r}
+row_ldc <- df_ldc %>%
+  select(TIME_PERIOD, obsValue) %>%
+  filter(TIME_PERIOD > base_year-10) %>%
+  mutate(obsValue = obsValue / 1e3) %>% # in billions
+  arrange(TIME_PERIOD) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = obsValue) %>%
+  mutate(target = "*Memo Item*: ODA to LDC") 
+
+row_ldc
+```
+
+
+## Final table
+
+Assembling all parts of the final table, and sort according to the original order
+
+```{r}
+table_comb <- table_final %>%
+  bind_rows(rows_ha) %>%
+  bind_rows(row_ldc) %>%
+  bind_rows(row_other_mult) %>%
+  arrange(factor(target, levels = c(
+    "**Total ODA**",
+    "*Bilateral*",
+    "Technical Cooperation",
+    "Debt relief",
+    "In Donor Costs",
+    "Humanitarian Aid",
+    "Loans",
+    "*Multilateral*",
+    "UN agencies",
+    "EU Institutions",
+    "World Bank",
+    "Regional Development Banks",
+    "Other Multilaterals",
+    "*Memo Item*: ODA to LDC"
+  ))) %>%
+  mutate(across(-target, ~ round(.x, 1))) #%>%
+  # FILTER FOR IN DONOR COSTS IF NEEDED
+  # filter(target != "In Donor Costs")
+  
+
+table_comb
+```
+
+Save the table as excel
+```{r}
+writexl::write_xlsx(table_comb, "output/table_14_oecd_oda_breakdown.xlsx")
+```
+

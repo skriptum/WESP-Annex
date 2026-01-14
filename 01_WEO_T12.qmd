@@ -1,0 +1,348 @@
+# Balance of Payments Table 12
+
+using WEO data from IMF
+
+Check with print version WESP 2025:
+- slight dviation for a Western Asiam Fuel Importing Country (probably Yemen)
+- feeds trough to other aggregates
+
+
+**UPDATE HERE**: START AND END YEAR FOR THE TABLE (end year can be in the future, WEO has projections)
+```{r}
+start_year <- 2016
+end_year <- 2026
+```
+
+## Imports
+
+the usual libraries...
+```{r}
+library(tidyverse)
+library(rsdmx) # for the API access
+```
+
+## Load the WEO dataset
+
+BCA = indicator for Current account balance in USD
+```{r}
+flowref <- 'WEO'
+key <- "*.BCA.A"
+```
+
+```{r}
+dataset_IMF <- as.data.frame(readSDMX(providerId = 'IMF_DATA',
+                                  resource = 'data',
+                                  flowRef = flowref,
+                                  key = key
+                                  ))
+```
+
+## Cleaning
+
+WEFM classications of countries (created in file `00_WESP_classification.qmd`)
+
+```{r}
+wesp <- haven::read_dta("./data/WESP_classification.dta") 
+```
+
+```{r}
+df <- dataset_IMF %>%
+  select(TIME_PERIOD, COUNTRY, OBS_VALUE) %>%
+  filter(TIME_PERIOD >= start_year & TIME_PERIOD <= end_year) %>%
+  right_join(wesp, by = c("COUNTRY" = "ISO3")) %>%
+  mutate(
+    OBS_VALUE = as.numeric(OBS_VALUE)
+  )
+```
+
+## Wrangling
+
+### Developed economies
+
+```{r}
+row_developed <- df %>%
+  filter(status == "DVD") %>%
+  mutate(group = "**Developed Economies**") %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value) 
+
+row_developed
+```
+now individual DVD countries
+
+```{r}
+row_developed_countries <- df %>%
+  filter(
+    status == "DVD",
+    COUNTRY %in% c("USA", "JPN", "KOR") #"GBR"
+    ) %>%
+  mutate(group = country) %>%
+  select(group, TIME_PERIOD, OBS_VALUE) %>%
+  mutate(
+    OBS_VALUE = as.numeric(OBS_VALUE) / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = OBS_VALUE)
+```
+
+some groups of DVD countries
+
+```{r}
+row_developed_groups <- df %>%
+  filter(
+    status == "DVD",
+  ) %>%
+  mutate(
+    group = case_when(
+      dummy_EU27 == 1 ~ "EU27",
+      dummy_otherEUR == 1 ~ "Other Europe",
+      COUNTRY %in% c("AUS", "CAN", "NZL") ~ "Other Developed Economies",
+    )
+  ) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value) %>%
+  filter(!is.na(group))
+```
+
+### Economies in Transtion
+
+```{r}
+row_eit <- df %>%
+  filter(status == "EIT") %>%
+  mutate(group = "**Economies in Transition**") %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+
+row_eit
+```
+
+
+```{r}
+row_eit_groups <- df %>%
+  filter(status == "EIT") %>%
+  mutate(
+    group = case_when(
+      dummy_SEE == 1 ~ "South-Eastern Europe",
+      dummy_CIS == 1 ~ "Commonwealth of Independent States",
+    )
+  ) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value) %>%
+  filter(!is.na(group)) %>%
+  # switch rows order
+  arrange(desc(group))
+
+row_eit_groups
+```
+
+## Developing economies
+
+### All DVG
+```{r}
+row_developing <- df %>%
+  filter(status == "DVG") %>%
+  mutate(group = "**Developing Economies**") %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+
+row_developing
+```
+
+
+```{r}
+# now the exporter / importer groups
+row_developing_group <- df %>%
+  filter(status == "DVG") %>%
+  mutate(group = case_when(
+    dummy_exporter == 1 ~ "Net Fuel Exporters",
+    dummy_exporter == 0 ~ "Net Fuel Importers",
+  )) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+
+row_developing_group
+```
+
+
+### Subregions
+
+#### LAC
+
+```{r}
+df_raw <- df %>%
+  filter(
+    status == "DVG",
+    wesp_region == "Latin America and the Caribbean"
+  ) 
+
+df_raw_all <- df_raw %>% mutate(group = "*Latin America and the Caribbean*") 
+
+df_raw_group <- df_raw %>%
+  mutate(
+    group = case_when(
+      dummy_exporter == 1 ~ "Net Fuel Exporters",
+      dummy_exporter == 0 ~ "Net Fuel Importers",
+    )
+  )
+
+row_LAC <- bind_rows(df_raw_all, df_raw_group) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+```
+
+#### Africa
+
+```{r}
+df_raw <- df %>%
+  filter(
+    status == "DVG",
+    wesp_region == "Africa"
+  ) 
+
+df_raw_all <- df_raw %>% mutate(group = "*Africa*") 
+
+df_raw_group <- df_raw %>%
+  mutate(
+    group = case_when(
+      dummy_exporter == 1 ~ "Net Fuel Exporters",
+      dummy_exporter == 0 ~ "Net Fuel Importers",
+    )
+  )
+
+row_AFR <- bind_rows(df_raw_all, df_raw_group) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+```
+
+#### Western Asia
+
+```{r}
+df_raw <- df %>%
+  filter(
+    status == "DVG",
+    wesp_subregion == "Western Asia"
+  ) 
+
+df_raw_all <- df_raw %>% mutate(group = "*Western Asia*") 
+
+df_raw_group <- df_raw %>%
+  mutate(
+    group = case_when(
+      dummy_exporter == 1 ~ "Net Fuel Exporters",
+      dummy_exporter == 0 ~ "Net Fuel Importers",
+    )
+  )
+
+row_WASIA <- bind_rows(df_raw_all, df_raw_group) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+```
+
+
+#### East and Southeast Asia
+
+```{r}
+df_raw <- df %>%
+  filter(
+    status == "DVG",
+    wesp_region == "Asia",
+    wesp_subregion != "Western Asia" # the leftoer regions are the other 2
+  ) 
+
+df_raw_all <- df_raw %>% mutate(group = "*East and South Asia*") 
+
+df_raw_group <- df_raw %>%
+  mutate(
+    group = case_when(
+      dummy_exporter == 1 ~ "Net Fuel Exporters",
+      dummy_exporter == 0 ~ "Net Fuel Importers",
+    )
+  )
+
+row_EASIA <- bind_rows(df_raw_all, df_raw_group) %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+```
+
+## World
+
+```{r}
+row_world <- df %>%
+  mutate(group = "**World**") %>%
+  group_by(group, TIME_PERIOD) %>%
+  reframe(
+    value = sum(OBS_VALUE, na.rm = TRUE), 
+    value = value / 1e9 # in billions
+  ) %>%
+  pivot_wider(names_from = TIME_PERIOD, values_from = value)
+
+row_world
+```
+
+
+## Combination
+
+```{r}
+df_final<-  bind_rows(
+    row_developed,
+    row_developed_countries,
+    row_developed_groups,
+    row_eit,
+    row_eit_groups,
+    row_developing,
+    row_developing_group,
+    row_AFR,
+    row_EASIA,
+    row_WASIA,
+    row_LAC,
+    row_world
+  ) %>%
+  select(-`NA`) %>% # remove NA artifact column
+  mutate(across(-group, ~round(.x, 1))) # round to 1 decimal place
+ 
+df_final
+```
+
+```{r}
+writexl::write_xlsx(df_final, "./output/table_12_bop.xlsx")
+```
+
