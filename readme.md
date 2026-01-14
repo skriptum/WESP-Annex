@@ -2,7 +2,7 @@
 
 Automated Reporting Pipeline for Annex Tables in WESP Report
 
-- uses respective data provider APIs (e.g OECD)
+- uses respective data provider APIs 
 - adjustable base year in all code files (UPDATE FOR NEW YEAR!)
 - transparent code (hopefully)
 
@@ -16,10 +16,10 @@ If there is a new updated regions file (e.g relevant for net-fuel importers / ex
 
 **Replicated Tables**
 
-- Table 9: Commodity prices
-- Table 12: Balance of Payments
-- Table 13: ODA Sources
-- Table 14: ODA uses
+- Table 9: Commodity prices (UNCTAD)
+- Table 12: Balance of Payments (IMF WEO)
+- Table 13: ODA Sources (OECD DAC)
+- Table 14: ODA uses (OECD DAC)
 
 The final tables in excel format are in `./output`
 
