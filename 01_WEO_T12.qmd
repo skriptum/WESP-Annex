@@ -39,8 +39,16 @@ dataset_IMF <- as.data.frame(readSDMX(providerId = 'IMF_DATA',
 
 ## Cleaning
 
-WEFM classications of countries (created in file `00_WESP_classification.qmd`)
+fix the palestine code in the IMF (from WBG for West Bank and Gaza to PSE)
+```{r}
+dataset_IMF <- dataset_IMF %>%
+  mutate(
+    COUNTRY = ifelse(COUNTRY == "WBG", "PSE", COUNTRY)
+  )
+```
 
+
+WEFM classications of countries (created in file `00_WESP_classification.qmd`)
 ```{r}
 wesp <- haven::read_dta("./data/WESP_classification.dta") 
 ```
