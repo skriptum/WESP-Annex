@@ -86,14 +86,17 @@ same Table: http://stats.oecd.org/index.aspx?datasetcode=table1
 
 Selection:
 - Donor: DAC countries (dont forget the DAC EU countries box at the bottom)
-- Measure: Official Development Assistance (ODA), Disbursements net
+- Measure: Official Development Assistance (ODA)
 - Flow type: Disbursements, net
 - Price base: Current
 - Combined unit of measure: US dollar, Millions
 
 
 ```{r}
-url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1010..1140.USD.V?startPeriod=2020&dimensionAtObservation=AllDimensions"
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU._Z.1010..1140.USD.V?startPeriod=2020&dimensionAtObservation=AllDimensions"
+
+# alternative to have the exact replication of the table (NOTE THE 1.5 in the URL call)
+# url <- "https://sdmx.oecd.org/public/rest/data/OECD.DCD.FSD,DSD_DAC1@DF_DAC1,1.5/AUS+AUT+BEL+CAN+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ITA+JPN+KOR+LVA+LTU+LUX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+GBR+USA+DAC+DACEU.1010..1140.USD.V._Z?startPeriod=2015&dimensionAtObservation=AllDimensions"
 ```
 
 ```{r}

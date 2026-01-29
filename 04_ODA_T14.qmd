@@ -115,7 +115,7 @@ row_other_mult
 ```
 
 
-### Humanitarian Aid data
+### Humanitarian Aid & Loans & Technical Cooperation data
 
 NOTE: Drawn from a different Table!
 
