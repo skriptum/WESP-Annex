@@ -3,8 +3,18 @@
 Automated Reporting Pipeline for Annex Tables in WESP Report
 
 - uses respective data provider APIs 
-- adjustable base year in all code files (UPDATE FOR NEW YEAR!)
-- transparent code (hopefully)
+- adjustable base year in all code files
+- transparent code (in each file there are a lot of comments / explanations)
+
+For an explanation on how to check the tables, see [this separate document](./HOW-TO-CHECK.md)! 
+
+
+
+**How to run the Code**
+
+Go into each file individually and adjust the base year (there is an explanation always before the first code cell). After installing the required packages you should be able to run them all (hopefully)
+
+
 
 
 
@@ -31,3 +41,6 @@ The final tables in excel format are in `./output`
 - some rows were updated completely
 
 = look at the respective code files, at the top there are table-specific notes and checks
+
+
+
