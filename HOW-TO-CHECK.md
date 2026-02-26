@@ -1,8 +1,6 @@
 # How to check the tables?
 
-This document explains how to make sure that the outputted tables are similar to the ones in the printed version. Of course you have to adjust the base year in the code for that...
-
-
+This document explains how to make sure that the outputted tables are correct and represent the data that is available online.
 
 For OECD tables, please make sure you use the provided links or click yourself trough the interface from the start. Old links often times contain a version number, therefore displaying old data! 
 
